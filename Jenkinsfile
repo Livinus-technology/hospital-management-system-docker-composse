@@ -172,7 +172,10 @@ stage('Scan Images') {
                     withEnv(["TRIVY_CACHE_DIR=${env.WORKSPACE}/trivy-cache-${serviceName}"]) {
                         sh """
                             mkdir -p trivy-reports
-                            trivy image --quiet --no-progress --skip-db-update --scanners vuln --exit-code 1 ${ignoreUnfixed} \
+                            # Seed the isolated cache folder with the database before scanning
+                            trivy image --quiet --no-progress --download-db-only || true
+
+                            trivy image --quiet --no-progress --scanners vuln --exit-code 1 ${ignoreUnfixed} \
                                 --severity '${params.TRIVY_SEVERITY}' \
                                 --format json --output 'trivy-reports/${serviceName}.json' \
                                 '${image}'
@@ -189,7 +192,6 @@ stage('Scan Images') {
         }
     }
 }
-
     stage('Login and Push') {
       steps {
         script {
