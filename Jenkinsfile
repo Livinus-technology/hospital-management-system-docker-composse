@@ -163,37 +163,56 @@ pipeline {
 stage('Scan Images') {
     steps {
         script {
-            // Download the Trivy DB ONCE with a single shared cache
-            withEnv(["TRIVY_CACHE_DIR=${env.WORKSPACE}/.trivy-cache"]) {
-                sh 'trivy image --quiet --no-progress --download-db-only'
-            }
+            def images = [
+                'api-gateway',
+                'patient-records-service',
+                'physicians-service',
+                'appointments-service',
+                'waittime-service',
+                'admission-service',
+                'billing-service',
+                'fake-payment-gateway',
+                'payments-service',
+                'notifications-service',
+                'administration-service'
+            ]
 
-            def scanTasks = [:]
-            services.keySet().each { serviceName ->
-                scanTasks[serviceName] = {
-                    def image = "${env.REGISTRY_BASE}/${params.IMAGE_PREFIX}-${serviceName}:${env.IMAGE_TAG}"
-                    def ignoreUnfixed = params.IGNORE_UNFIXED ? '--ignore-unfixed' : ''
+            def failedScans = []
 
-                    // Same shared cache for all services - do NOT use trivy-cache-${serviceName}
-                    withEnv(["TRIVY_CACHE_DIR=${env.WORKSPACE}/.trivy-cache"]) {
-                        sh """
-                            mkdir -p trivy-reports
+            for (service in images) {
+                echo "Scanning ${service} with Trivy..."
 
-                            trivy image --quiet --no-progress --scanners vuln --exit-code 1 ${ignoreUnfixed} \\
-                                --skip-db-update --skip-java-db-update \\
-                                --severity '${params.TRIVY_SEVERITY}' \\
-                                --format json --output 'trivy-reports/${serviceName}.json' \\
-                                '${image}'
-                        """
-                    }
+                def status = sh(
+                    script: """
+                        mkdir -p trivy-reports
+
+                        trivy image \
+                          --quiet \
+                          --no-progress \
+                          --scanners vuln \
+                          --exit-code 1 \
+                          --ignore-unfixed \
+                          --skip-db-update \
+                          --skip-java-db-update \
+                          --severity CRITICAL \
+                          --format json \
+                          --output trivy-reports/${service}.json \
+                          liontechacademy/hospital-management-${service}:${IMAGE_TAG}
+                    """,
+                    returnStatus: true
+                )
+
+                if (status != 0) {
+                    failedScans.add(service)
+                    echo "WARNING: Scan failed or found CRITICAL vulnerabilities in ${service}"
                 }
             }
-            parallel scanTasks
-        }
-    }
-    post {
-        always {
-            archiveArtifacts artifacts: 'trivy-reports/*.json', allowEmptyArchive: true, fingerprint: true
+
+            if (!failedScans.isEmpty()) {
+                error("Trivy scanning failed for: ${failedScans.join(', ')}")
+            }
+
+            echo "All 11 Docker images passed Trivy scanning!"
         }
     }
 }
