@@ -181,7 +181,6 @@ pipeline {
                     }
                 }
             }
-        }
             parallel scanTasks
         }
     }
