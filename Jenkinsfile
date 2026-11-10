@@ -160,8 +160,7 @@ pipeline {
         sh 'trivy image --no-progress --download-db-only'
       }
     }
-
-    stage('Scan Images') {
+stage('Scan Images') {
     steps {
         script {
             def scanTasks = [:]
@@ -184,16 +183,12 @@ pipeline {
             parallel scanTasks
         }
     }
-}
-          parallel scanTasks
-        }
-      }
-      post {
+    post {
         always {
-          archiveArtifacts artifacts: 'trivy-reports/*.json', allowEmptyArchive: true, fingerprint: true
+            archiveArtifacts artifacts: 'trivy-reports/*.json', allowEmptyArchive: true, fingerprint: true
         }
-      }
     }
+}
 
     stage('Login and Push') {
       steps {
