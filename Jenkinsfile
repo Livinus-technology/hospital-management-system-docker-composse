@@ -163,21 +163,26 @@ pipeline {
 stage('Scan Images') {
     steps {
         script {
+            // Download the Trivy DB ONCE with a single shared cache
+            withEnv(["TRIVY_CACHE_DIR=${env.WORKSPACE}/.trivy-cache"]) {
+                sh 'trivy image --quiet --no-progress --download-db-only'
+            }
+
             def scanTasks = [:]
             services.keySet().each { serviceName ->
                 scanTasks[serviceName] = {
                     def image = "${env.REGISTRY_BASE}/${params.IMAGE_PREFIX}-${serviceName}:${env.IMAGE_TAG}"
                     def ignoreUnfixed = params.IGNORE_UNFIXED ? '--ignore-unfixed' : ''
 
-                    withEnv(["TRIVY_CACHE_DIR=${env.WORKSPACE}/trivy-cache-${serviceName}"]) {
+                    // Same shared cache for all services - do NOT use trivy-cache-${serviceName}
+                    withEnv(["TRIVY_CACHE_DIR=${env.WORKSPACE}/.trivy-cache"]) {
                         sh """
                             mkdir -p trivy-reports
-                            # Seed the isolated cache folder with the database before scanning
-                            trivy image --quiet --no-progress --download-db-only || true
 
-                            trivy image --quiet --no-progress --scanners vuln --exit-code 1 ${ignoreUnfixed} \
-                                --severity '${params.TRIVY_SEVERITY}' \
-                                --format json --output 'trivy-reports/${serviceName}.json' \
+                            trivy image --quiet --no-progress --scanners vuln --exit-code 1 ${ignoreUnfixed} \\
+                                --skip-db-update --skip-java-db-update \\
+                                --severity '${params.TRIVY_SEVERITY}' \\
+                                --format json --output 'trivy-reports/${serviceName}.json' \\
                                 '${image}'
                         """
                     }
