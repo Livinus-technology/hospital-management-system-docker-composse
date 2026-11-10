@@ -197,7 +197,7 @@ stage('Scan Images') {
                           --severity CRITICAL \
                           --format json \
                           --output trivy-reports/${service}.json \
-                          liontechacademy/hospital-management-${service}:${IMAGE_TAG}
+                          intellivinus2026/hospital-management-${service}:${IMAGE_TAG}
                     """,
                     returnStatus: true
                 )
