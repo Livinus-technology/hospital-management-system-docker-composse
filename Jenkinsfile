@@ -92,7 +92,7 @@ pipeline {
         script {
           if (params.REGISTRY_PROVIDER == 'dockerhub') {
             env.REGISTRY_HOST = 'docker.io'
-            env.REGISTRY_BASE = params.DOCKERHUB_NAMESPACE
+            env.REGISTRY_BASE = 'docker.io/intellivinus2026'
           } else {
             withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: params.AWS_CREDENTIALS_ID]]) {
               def actualAccountId = sh(
