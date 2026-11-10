@@ -162,22 +162,30 @@ pipeline {
     }
 
     stage('Scan Images') {
-      steps {
+    steps {
         script {
-          def scanTasks = [:]
-          services.keySet().each { serviceName ->
-            scanTasks[serviceName] = {
-              def image = "${env.REGISTRY_BASE}/${params.IMAGE_PREFIX}-${serviceName}:${env.IMAGE_TAG}"
-              def ignoreUnfixed = params.IGNORE_UNFIXED ? '--ignore-unfixed' : ''
-              sh """
-                mkdir -p trivy-reports
-                trivy image --quiet --no-progress --skip-db-update --scanners vuln --exit-code 1 ${ignoreUnfixed} \\
-                  --severity '${params.TRIVY_SEVERITY}' \\
-                  --format json --output 'trivy-reports/${serviceName}.json' \\
-                  '${image}'
-              """
+            def scanTasks = [:]
+            services.keySet().each { serviceName ->
+                scanTasks[serviceName] = {
+                    def image = "${env.REGISTRY_BASE}/${params.IMAGE_PREFIX}-${serviceName}:${env.IMAGE_TAG}"
+                    def ignoreUnfixed = params.IGNORE_UNFIXED ? '--ignore-unfixed' : ''
+
+                    withEnv(["TRIVY_CACHE_DIR=${env.WORKSPACE}/trivy-cache-${serviceName}"]) {
+                        sh """
+                            mkdir -p trivy-reports
+                            trivy image --quiet --no-progress --skip-db-update --scanners vuln --exit-code 1 ${ignoreUnfixed} \
+                                --severity '${params.TRIVY_SEVERITY}' \
+                                --format json --output 'trivy-reports/${serviceName}.json' \
+                                '${image}'
+                        """
+                    }
+                }
             }
-          }
+        }
+            parallel scanTasks
+        }
+    }
+}
           parallel scanTasks
         }
       }
